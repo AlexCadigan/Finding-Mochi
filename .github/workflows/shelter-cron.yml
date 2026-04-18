@@ -1,0 +1,15 @@
+name: Shelter Scraper Cron
+
+on:
+  schedule:
+    - cron: "*/5 * * * *" # every 5 minutes
+  workflow_dispatch: # manual run button
+
+jobs:
+  run-scraper:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Call Vercel API
+        run: |
+          curl -X GET "https://finding-mochi-qp4y.vercel.app/api/scan-shelter"
