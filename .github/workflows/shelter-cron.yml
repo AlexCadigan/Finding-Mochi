@@ -3,7 +3,6 @@ name: Shelter Scraper Cron
 on:
   schedule:
     - cron: "*/5 * * * *" # every 5 minutes
-  workflow_dispatch: # manual run button
 
 jobs:
   run-scraper:
