@@ -1,30 +1,61 @@
-import { fetchShelterPage } from "@/lib/scraper";
-import { parseAnimals, parseAgeToMonths } from "@/lib/parser";
+import {
+  fetchAngelsWishPage,
+  fetchMadisonCatProjectPage,
+  fetchShelterPage,
+} from "@/lib/scraper";
+import {
+  parseAnimals,
+  parseAgeToMonths,
+  parsePetangoAnimals,
+} from "@/lib/parser";
 import { isYoungKitten } from "@/lib/filters";
 import { supabase } from "@/lib/supabase";
 import { sendDiscordAlert } from "@/lib/notifier";
 
 export async function GET() {
-  const html = await fetchShelterPage();
+  const [shelterHtml, angelsHtml, madisonHtml] = await Promise.all([
+    fetchShelterPage(),
+    fetchAngelsWishPage(),
+    fetchMadisonCatProjectPage(),
+  ]);
 
-  const animals = parseAnimals(html);
+  const animals = [
+    ...parseAnimals(shelterHtml).map((animal) => ({
+      ...animal,
+      source: "Give Shelter",
+      source_url:
+        "https://www.giveshelter.org/our-services/adopt?species=Cat&age=Under1yearOld",
+      external_id: `Give Shelter:${animal.url || animal.name}`,
+    })),
+    ...parsePetangoAnimals(
+      angelsHtml,
+      "Angel's Wish",
+      "https://angelswish.org/available-animals/",
+    ),
+    ...parsePetangoAnimals(
+      madisonHtml,
+      "Madison Cat Project",
+      "https://www.madisoncatproject.org/browse-indoor",
+    ),
+  ];
 
-  const enriched = animals.map((a) => ({
-    ...a,
-    ageMonths: parseAgeToMonths(a.ageText),
+  const enriched = animals.map((animal) => ({
+    ...animal,
+    ageMonths: animal.ageText ? parseAgeToMonths(animal.ageText) : null,
   }));
 
   const kittens = enriched.filter(isYoungKitten);
 
-  // Upsert into DB
   await supabase.from("animals").upsert(
-    kittens.map((k) => ({
-      external_id: k.url || k.name,
-      name: k.name,
-      age_text: k.ageText,
-      age_months: k.ageMonths,
+    kittens.map((kitten) => ({
+      external_id: kitten.external_id ?? `${kitten.source}:${kitten.url || kitten.name}`,
+      name: kitten.name,
+      age_text: kitten.ageText,
+      age_months: kitten.ageMonths,
       species: "cat",
-      url: k.url,
+      url: kitten.url,
+      source: kitten.source,
+      source_url: kitten.source_url,
       last_seen: new Date(),
     })),
     { onConflict: "external_id" },
@@ -42,7 +73,6 @@ export async function GET() {
 
   for (const kitten of newKittens) {
     await sendDiscordAlert(kitten);
-
     await supabase.from("alerts_sent").insert({
       animal_id: kitten.id,
     });

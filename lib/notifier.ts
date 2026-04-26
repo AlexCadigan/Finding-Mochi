@@ -1,16 +1,17 @@
 export async function sendDiscordAlert(animal: any) {
   const webhook = process.env.DISCORD_WEBHOOK_URL!;
   const ageMonths = animal.ageMonths ?? animal.age_months;
-  const ageText = ageMonths != null ? `${ageMonths} months` : "Unknown";
+  const ageText = animal.ageText ?? (ageMonths != null ? `${ageMonths} months` : "Unknown");
+  const source = animal.source ?? "Unknown Source";
+  const link = animal.url || animal.source_url || null;
 
   const message = {
     content: `🐱 **New Kitten Alert!**
 
 **Name:** ${animal.name}
 **Age:** ${ageText}
-${animal.url ? `🔗 ${animal.url}` : ""}
-
-🐾 https://www.giveshelter.org/our-services/adopt?species=Cat&age=Under1yearOld`,
+**Source:** ${source}
+${link ? `🔗 ${link}` : ""}`,
   };
 
   await fetch(webhook, {

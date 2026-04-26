@@ -7,9 +7,7 @@ export function parseAnimals(html: string) {
 
   $(".petCard__details").each((_, el) => {
     const raw = $(el).text();
-
     const parsed = parsePetBlock(raw);
-
     const link = $(el).closest("a").attr("href");
 
     animals.push({
@@ -30,31 +28,13 @@ function parsePetBlock(text: string) {
 
   const name = lines[0] ?? null;
 
-  // 🔥 Find the line that actually contains age info
   const ageLine =
     lines.find((l) => /\d+\s*(month|months|year|years|week|weeks)/i.test(l)) ??
     "";
 
-  // Gender is usually in the same line as age OR a separate prefix
   const gender = ageLine.includes("|") ? ageLine.split("|")[0].trim() : null;
+  const ageMonths = parseAgeToMonths(ageLine);
 
-  // Extract age safely from ANY line that contains it
-  const ageMatch = ageLine.match(
-    /(\d+)\s*(month|months|year|years|week|weeks)/i,
-  );
-
-  let ageMonths: number | null = null;
-
-  if (ageMatch) {
-    const value = parseInt(ageMatch[1]);
-    const unit = ageMatch[2].toLowerCase();
-
-    if (unit.startsWith("year")) ageMonths = value * 12;
-    else if (unit.startsWith("week")) ageMonths = Math.ceil(value / 4);
-    else ageMonths = value;
-  }
-
-  // Breed = first non-name, non-age line that isn't noise
   const breed =
     lines.find(
       (l) =>
@@ -73,24 +53,74 @@ function parsePetBlock(text: string) {
   };
 }
 
+export function parsePetangoAnimals(
+  html: string,
+  source: string,
+  source_url: string,
+) {
+  const $ = cheerio.load(html);
+  const animals: any[] = [];
+
+  $(".list-item").each((_, el) => {
+    const element = $(el);
+    const name = element.find(".list-animal-name").text().trim() || null;
+    const species = element.find(".list-animal-species").text().trim() || null;
+    const gender = element.find(".list-animal-sexSN").text().trim() || null;
+    const breed = element.find(".list-animal-breed").text().trim() || null;
+    const ageText = element.find(".list-animal-age").text().trim() || null;
+    const href = element.find(".list-animal-name a").attr("href") || "";
+    const detailMatch = href.match(/poptastic\('([^']+)'\)/);
+    const detailPath = detailMatch?.[1] ?? href;
+    const url = detailPath
+      ? detailPath.startsWith("http")
+        ? detailPath
+        : new URL(
+            detailPath,
+            "https://ws.petango.com/webservices/adoptablesearch/",
+          ).toString()
+      : null;
+
+    const idMatch = href.match(/id=(\d+)/);
+    const externalId = idMatch ? `${source}:${idMatch[1]}` : `${source}:${name}`;
+
+    animals.push({
+      name,
+      species,
+      gender,
+      breed,
+      ageText,
+      url,
+      source,
+      source_url,
+      external_id: externalId,
+    });
+  });
+
+  return animals;
+}
+
 export function parseAgeToMonths(ageText: string): number | null {
   const lower = ageText.toLowerCase();
+  const matches = [...lower.matchAll(/(\d+)\s*(year|years|month|months|week|weeks)/gi)];
 
-  // extract number + unit anywhere in string
-  const match = lower.match(/(\d+)\s*(month|months|year|years|week|weeks)/i);
-
-  if (!match) return null;
-
-  const value = parseInt(match[1]);
-  const unit = match[2];
-
-  if (unit.startsWith("year")) {
-    return value * 12;
+  if (!matches.length) {
+    return null;
   }
 
-  if (unit.startsWith("week")) {
-    return Math.ceil(value / 4);
+  let months = 0;
+
+  for (const match of matches) {
+    const value = parseInt(match[1], 10);
+    const unit = match[2].toLowerCase();
+
+    if (unit.startsWith("year")) {
+      months += value * 12;
+    } else if (unit.startsWith("week")) {
+      months += Math.ceil(value / 4);
+    } else {
+      months += value;
+    }
   }
 
-  return value;
+  return months;
 }
