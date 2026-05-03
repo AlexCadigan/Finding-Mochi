@@ -31,6 +31,14 @@ function parsePetBlock(text: string) {
   const ageLine =
     lines.find((l) => /\d+\s*(month|months|year|years|week|weeks)/i.test(l)) ??
     "";
+  const ageIndex = lines.findIndex((l) => l === ageLine);
+
+  const availabilityLabel =
+    ageIndex > 1 &&
+    !/\b(male|female|unknown)\b/i.test(lines[1]) &&
+    !lines[1].includes("|")
+      ? lines[1]
+      : null;
 
   const gender = ageLine.includes("|") ? ageLine.split("|")[0].trim() : null;
   const ageMonths = parseAgeToMonths(ageLine);
@@ -40,6 +48,7 @@ function parsePetBlock(text: string) {
       (l) =>
         l !== name &&
         l !== ageLine &&
+        l !== availabilityLabel &&
         !l.toLowerCase().includes("unavailable") &&
         !/\d+\s*(month|months|year|years|week|weeks)/i.test(l),
     ) ?? null;
@@ -50,6 +59,7 @@ function parsePetBlock(text: string) {
     ageText: ageLine || null,
     ageMonths,
     breed,
+    availabilityLabel,
   };
 }
 
@@ -81,7 +91,9 @@ export function parsePetangoAnimals(
       : null;
 
     const idMatch = href.match(/id=(\d+)/);
-    const externalId = idMatch ? `${source}:${idMatch[1]}` : `${source}:${name}`;
+    const externalId = idMatch
+      ? `${source}:${idMatch[1]}`
+      : `${source}:${name}`;
 
     animals.push({
       name,
@@ -101,7 +113,9 @@ export function parsePetangoAnimals(
 
 export function parseAgeToMonths(ageText: string): number | null {
   const lower = ageText.toLowerCase();
-  const matches = [...lower.matchAll(/(\d+)\s*(year|years|month|months|week|weeks)/gi)];
+  const matches = [
+    ...lower.matchAll(/(\d+)\s*(year|years|month|months|week|weeks)/gi),
+  ];
 
   if (!matches.length) {
     return null;
