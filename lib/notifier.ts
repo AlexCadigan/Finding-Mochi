@@ -12,12 +12,8 @@ export async function sendDiscordAlert(animal: any) {
     content: `🐱 **New Kitten Alert!**
 
 **Name:** ${animal.name}
-${
-  availabilityLabel
-    ? `**Status:** ${availabilityLabel}
-`
-    : ""
-}**Age:** ${ageText}
+**Status:** ${availabilityLabel ?? "Available for visit"}
+**Age:** ${ageText}
 **Source:** ${source}
 ${link ? `🔗 ${link}` : ""}`.trim(),
   };
